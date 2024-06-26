@@ -17,12 +17,22 @@ func NewRepo(DB *pgx.Conn) *Repo {
 
 func (r *Repo) GetItemByID(ctx context.Context, id int64) (*entity.TranslationItem, error) {
 	const query = `SELECT id, word, translation FROM items WHERE id = $1`
-	row := r.DB.QueryRow(ctx, query, id)
-
 	var mdl model
-	if err := row.Scan(&mdl.ID, &mdl.Word, &mdl.Translation); err != nil {
-		return nil, fmt.Errorf("scan row: %w", err)
+	if err := r.DB.QueryRow(ctx, query, id).Scan(&mdl); err != nil {
+		return nil, fmt.Errorf("getItemByID scan row:  %w", err)
 	}
 
 	return mdl.toTranslationItem(), nil
+}
+
+func (r *Repo) CreateItem(ctx context.Context, item *entity.TranslationItem) (int64, error) {
+	const query = `INSERT INTO items(word, translation) VALUES ($1,$2) RETURNING id`
+
+	var id int64
+	mdl := modelFromTranslationItem(item)
+	if err := r.DB.QueryRow(ctx, query, mdl.Word, mdl.Translation).Scan(&id); err != nil {
+		return 0, fmt.Errorf("createItem scan row:  %w", err)
+	}
+
+	return id, nil
 }
