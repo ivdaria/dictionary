@@ -3,20 +3,27 @@ package main
 import (
 	"context"
 	"dictionary/internal/config"
-	"dictionary/internal/entity"
+	"dictionary/internal/gateway"
 	translationitems "dictionary/internal/repository/translation-items"
 	"fmt"
+	"github.com/jackc/pgx/v5"
 	"gopkg.in/yaml.v3"
 	"log/slog"
-	"math/rand"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
-
-	"github.com/jackc/pgx/v5"
 )
 
 func main() {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-signalChan
+		cancel()
+	}()
 
 	yamlFile, err := os.ReadFile("config.yml")
 	if err != nil {
@@ -43,41 +50,17 @@ func main() {
 
 	repo := translationitems.NewRepo(conn)
 
-	for i := 0; i < 1000; i++ {
-		itemToCreate := &entity.TranslationItem{
-			ID:          0, //Заполнять не надо
-			Word:        String(3),
-			Translation: String(3),
-		}
-		id, err := repo.CreateItem(ctx, itemToCreate)
-		if err != nil {
-			slog.ErrorContext(ctx, "create random item", slog.String("err", err.Error()))
+	appServer := gateway.NewAppServer(&cfg, repo)
+	go func() {
+		if err := appServer.Run(); err != nil {
+			slog.ErrorContext(ctx, "app server is closed with error", slog.String("err", err.Error()))
 			panic(err)
 		}
+	}()
 
-		item, err := repo.GetItemByID(ctx, id)
-		if err != nil {
-			slog.ErrorContext(ctx, "get item by id", slog.String("err", err.Error()))
-		}
-		fmt.Println(item)
+	<-ctx.Done()
+	ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
+	if err := appServer.Shutdown(ctx); err != nil {
+		slog.ErrorContext(ctx, "app server shutdown", slog.String("err", err.Error()))
 	}
-
-}
-
-const charset = "abcdefghijklmnopqrstuvwxyz" +
-	"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-
-var seededRand *rand.Rand = rand.New(
-	rand.NewSource(time.Now().UnixNano()))
-
-func StringWithCharset(length int, charset string) string {
-	b := make([]byte, length)
-	for i := range b {
-		b[i] = charset[seededRand.Intn(len(charset))]
-	}
-	return string(b)
-}
-
-func String(length int) string {
-	return StringWithCharset(length, charset)
 }

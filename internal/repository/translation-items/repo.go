@@ -3,6 +3,7 @@ package translationitems
 import (
 	"context"
 	"dictionary/internal/entity"
+	"errors"
 	"fmt"
 	"github.com/jackc/pgx/v5"
 )
@@ -14,6 +15,8 @@ type Repo struct {
 func NewRepo(DB *pgx.Conn) *Repo {
 	return &Repo{DB: DB}
 }
+
+var ErrNoRowsAffected = errors.New("no rows affected")
 
 func (r *Repo) GetItemByID(ctx context.Context, id int64) (*entity.TranslationItem, error) {
 	const query = `SELECT id, word, translation FROM items WHERE id = $1`
@@ -35,4 +38,19 @@ func (r *Repo) CreateItem(ctx context.Context, item *entity.TranslationItem) (in
 	}
 
 	return id, nil
+}
+
+func (r *Repo) UpdateItem(ctx context.Context, item *entity.TranslationItem) error {
+	const query = `UPDATE items SET word = $1, translation = $2 WHERE id = $3`
+
+	mdl := modelFromTranslationItem(item)
+	commandTag, err := r.DB.Exec(ctx, query, mdl.Word, mdl.Translation, mdl.ID)
+	if err != nil {
+		return fmt.Errorf("exec query: %w", err)
+	}
+
+	if commandTag.RowsAffected() == 0 {
+		return ErrNoRowsAffected
+	}
+	return nil
 }

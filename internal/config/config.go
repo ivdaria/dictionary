@@ -8,6 +8,11 @@ type DBConfig struct {
 	Database string `yaml:"database"`
 }
 
+type HTTPConfig struct {
+	ListenAddr string `yaml:"listenAddr"`
+}
+
 type Config struct {
-	DBConfig DBConfig `yaml:"db"`
+	DBConfig DBConfig   `yaml:"db"`
+	HTTP     HTTPConfig `yaml:"http"`
 }
