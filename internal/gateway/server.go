@@ -69,6 +69,7 @@ func (s *AppServer) CreateItem(w http.ResponseWriter, r *http.Request) {
 			slog.String("error", fmt.Errorf("create item by repo: %w", err).Error()),
 		)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 
 	responseMdl := model.CreateItemResponseBody{
@@ -83,6 +84,7 @@ func (s *AppServer) CreateItem(w http.ResponseWriter, r *http.Request) {
 			slog.String("error", fmt.Errorf("marshall response: %w", err).Error()),
 		)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 
 	w.WriteHeader(http.StatusCreated)
@@ -92,5 +94,6 @@ func (s *AppServer) CreateItem(w http.ResponseWriter, r *http.Request) {
 			"create item",
 			slog.String("error", fmt.Errorf("write response: %w", err).Error()),
 		)
+		return
 	}
 }
