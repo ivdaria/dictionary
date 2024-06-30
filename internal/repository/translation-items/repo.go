@@ -3,6 +3,7 @@ package translationitems
 import (
 	"context"
 	"dictionary/internal/entity"
+	er "dictionary/internal/errors"
 	"errors"
 	"fmt"
 	"github.com/jackc/pgx/v5"
@@ -16,12 +17,13 @@ func NewRepo(DB *pgx.Conn) *Repo {
 	return &Repo{DB: DB}
 }
 
-var ErrNoRowsAffected = errors.New("no rows affected")
-
 func (r *Repo) GetItemByID(ctx context.Context, id int64) (*entity.TranslationItem, error) {
 	const query = `SELECT id, word, translation FROM items WHERE id = $1`
 	var mdl model
 	if err := r.DB.QueryRow(ctx, query, id).Scan(&mdl); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, er.ErrNotFound
+		}
 		return nil, fmt.Errorf("getItemByID scan row:  %w", err)
 	}
 
@@ -50,7 +52,32 @@ func (r *Repo) UpdateItem(ctx context.Context, item *entity.TranslationItem) err
 	}
 
 	if commandTag.RowsAffected() == 0 {
-		return ErrNoRowsAffected
+		return er.ErrNoRowsAffected
 	}
 	return nil
+}
+
+func (r *Repo) ListItems(ctx context.Context) ([]*entity.TranslationItem, error) {
+	const query = `SELECT id, word, translation FROM items ORDER BY word`
+	rows, err := r.DB.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("listItems select:  %w", err)
+	}
+	defer rows.Close()
+
+	var items []*entity.TranslationItem
+	for rows.Next() {
+		var mdl model
+		if err := rows.Scan(&mdl); err != nil {
+			return nil, fmt.Errorf("listItems scan row:  %w", err)
+		}
+		item := mdl.toTranslationItem()
+		items = append(items, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("listItems rows error:  %w", err)
+	}
+
+	return items, nil
 }
