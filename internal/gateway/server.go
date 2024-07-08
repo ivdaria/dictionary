@@ -20,6 +20,7 @@ type itemsRepo interface {
 	CreateItem(ctx context.Context, item *entity.TranslationItem) (int64, error)
 	UpdateItem(ctx context.Context, item *entity.TranslationItem) error
 	ListItems(ctx context.Context) ([]*entity.TranslationItem, error)
+	DeleteItem(ctx context.Context, id int64) error
 }
 
 type AppServer struct {
@@ -42,6 +43,7 @@ func NewAppServer(cfg *config.Config, repo itemsRepo) *AppServer {
 	mux.HandleFunc("POST /items/{id}/edit", appServer.UpdateItem)
 	mux.HandleFunc("GET /items/{id}", appServer.GetItemByID)
 	mux.HandleFunc("GET /items", appServer.ListItems)
+	mux.HandleFunc("DELETE /items/{id}", appServer.DeleteItem)
 	return appServer
 }
 
@@ -204,6 +206,7 @@ func (s *AppServer) UpdateItem(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 }
+
 func (s *AppServer) ListItems(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -250,4 +253,30 @@ func (s *AppServer) ListItems(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
+}
+
+func (s *AppServer) DeleteItem(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	idString := r.PathValue("id")
+	id, _ := strconv.ParseInt(idString, 10, 64)
+
+	err := s.repo.DeleteItem(ctx, id)
+	if err != nil {
+		slog.ErrorContext(
+			ctx,
+			"delete item",
+			slog.String("error", fmt.Errorf("delete item: %w", err).Error()),
+		)
+
+		if errors.Is(err, er.ErrNoRowsAffected) {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }

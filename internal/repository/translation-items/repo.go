@@ -81,3 +81,16 @@ func (r *Repo) ListItems(ctx context.Context) ([]*entity.TranslationItem, error)
 
 	return items, nil
 }
+func (r *Repo) DeleteItem(ctx context.Context, id int64) error {
+	const query = `DELETE FROM items WHERE id = $1`
+
+	commandTag, err := r.DB.Exec(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("exec query to delete item by id: %w", err)
+	}
+
+	if commandTag.RowsAffected() == 0 {
+		return er.ErrNoRowsAffected
+	}
+	return nil
+}
