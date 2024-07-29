@@ -2,17 +2,19 @@ package main
 
 import (
 	"context"
-	"dictionary/internal/config"
-	"dictionary/internal/gateway"
-	translationitems "dictionary/internal/repository/translation-items"
 	"fmt"
-	"github.com/jackc/pgx/v5"
-	"gopkg.in/yaml.v3"
 	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"dictionary/internal/config"
+	"dictionary/internal/gateway"
+	translationitems "dictionary/internal/repository/translation-items"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+	"gopkg.in/yaml.v3"
 )
 
 func main() {
@@ -35,18 +37,20 @@ func main() {
 	}
 
 	dbDSN := fmt.Sprintf(
-		"postgres://%s:%s@%s:%d/%s",
+		"postgres://%s:%s@%s:%d/%s?&pool_max_conns=%d",
 		cfg.DBConfig.User,
 		cfg.DBConfig.Password,
 		cfg.DBConfig.Host,
 		cfg.DBConfig.Port,
 		cfg.DBConfig.Database,
+		cfg.DBConfig.MaxConnections,
 	)
-	conn, err := pgx.Connect(ctx, dbDSN)
+
+	conn, err := pgxpool.New(ctx, dbDSN)
 	if err != nil {
 		panic(err)
 	}
-	defer conn.Close(context.Background())
+	defer conn.Close()
 
 	repo := translationitems.NewRepo(conn)
 

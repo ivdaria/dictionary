@@ -4,6 +4,7 @@ db:
   user: postgres
   password: postgres
   database: dict
+  maxConn: 10
 
 http:
   listenAddr: "0.0.0.0:8080"
