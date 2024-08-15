@@ -15,9 +15,9 @@ type UpdateItemRequestBody struct {
 }
 
 type Item struct {
-	ID          int64  `json:"id"`
-	Word        string `json:"word"`
-	Translation string `json:"translation"`
+	ID          int64  `json:"cardId"`
+	Word        string `json:"originalWord"`
+	Translation string `json:"translationWord"`
 }
 
 type GetItemByIDResponseBody Item

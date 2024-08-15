@@ -2,18 +2,21 @@ package translationitems
 
 import (
 	"context"
-	"dictionary/internal/entity"
-	er "dictionary/internal/errors"
 	"errors"
 	"fmt"
+
+	"dictionary/internal/entity"
+	er "dictionary/internal/errors"
+
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Repo struct {
-	DB *pgx.Conn
+	DB *pgxpool.Pool
 }
 
-func NewRepo(DB *pgx.Conn) *Repo {
+func NewRepo(DB *pgxpool.Pool) *Repo {
 	return &Repo{DB: DB}
 }
 

@@ -2,17 +2,18 @@ package gateway
 
 import (
 	"context"
-	"dictionary/internal/config"
-	"dictionary/internal/convert"
-	"dictionary/internal/entity"
-	er "dictionary/internal/errors"
-	"dictionary/pkg/gateway/model"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
+
+	"dictionary/internal/config"
+	"dictionary/internal/convert"
+	"dictionary/internal/entity"
+	er "dictionary/internal/errors"
+	"dictionary/pkg/gateway/model"
 )
 
 type itemsRepo interface {
@@ -44,6 +45,8 @@ func NewAppServer(cfg *config.Config, repo itemsRepo) *AppServer {
 	mux.HandleFunc("GET /items/{id}", appServer.GetItemByID)
 	mux.HandleFunc("GET /items", appServer.ListItems)
 	mux.HandleFunc("DELETE /items/{id}", appServer.DeleteItem)
+
+	server.Handler = appServer.corsMiddleware(server.Handler)
 	return appServer
 }
 
@@ -59,12 +62,29 @@ func (s *AppServer) Shutdown(ctx context.Context) error {
 	return s.server.Shutdown(ctx)
 }
 
+func (s *AppServer) corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With, Accept, Origin, X-AUTH-SID, X-ACCESS-TOKEN")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		w.Header().Set("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS,HEAD")
+		w.Header().Add("Access-Control-Allow-Origin", r.Header.Get("Origin"))
+
+		// immediately response for preflight request
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 func (s *AppServer) CreateItem(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	//New decoder -чтобы десериализовать тело запроса в нашу модель
-	//не обязательно джсон. можем прислать хмл и тд. Соответственно, тогда нужен будет другой декодер
+	// New decoder -чтобы десериализовать тело запроса в нашу модель
+	// не обязательно джсон. можем прислать хмл и тд. Соответственно, тогда нужен будет другой декодер
 	decoder := json.NewDecoder(r.Body)
-	//создаем модель, в которую будем декодировать тело запроса
+	// создаем модель, в которую будем декодировать тело запроса
 	mdl := model.CreateItemRequestBody{}
 	if err := decoder.Decode(&mdl); err != nil {
 		slog.ErrorContext(
@@ -77,9 +97,9 @@ func (s *AppServer) CreateItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//получаем айтем из модели
+	// получаем айтем из модели
 	item := convert.ItemFromCreateItemRequestBody(&mdl)
-	//вызываем нашу функцию
+	// вызываем нашу функцию
 	id, err := s.repo.CreateItem(ctx, item)
 	if err != nil {
 		slog.ErrorContext(
@@ -91,12 +111,12 @@ func (s *AppServer) CreateItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//Модель на ответ создается для того, чтобы держать слой API отделенным от слоя бизнес логики
+	// Модель на ответ создается для того, чтобы держать слой API отделенным от слоя бизнес логики
 	responseMdl := model.CreateItemResponseBody{
 		ID: id,
 	}
 
-	//сериализация модели на ответ
+	// сериализация модели на ответ
 	responseMdlBytes, err := json.Marshal(responseMdl)
 	if err != nil {
 		slog.ErrorContext(
@@ -108,9 +128,9 @@ func (s *AppServer) CreateItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//пишем заголовок о том, что слово успешно создано
-	//нужно сначала заголовок писать, а потом тело.
-	//Иначе сначала запишется тело, а потом заголовок сразу запишется в статус 200 ОК
+	// пишем заголовок о том, что слово успешно создано
+	// нужно сначала заголовок писать, а потом тело.
+	// Иначе сначала запишется тело, а потом заголовок сразу запишется в статус 200 ОК
 
 	w.WriteHeader(http.StatusCreated)
 	if _, err := w.Write(responseMdlBytes); err != nil {
